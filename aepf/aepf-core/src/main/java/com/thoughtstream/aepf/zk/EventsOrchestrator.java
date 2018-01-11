@@ -11,9 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
 
 import static com.thoughtstream.aepf.DefaultConstants.DEFAULT_CHAR_SET;
-import static com.thoughtstream.aepf.zk.Constantants.WATERMARK_STR;
+import static com.thoughtstream.aepf.DefaultConstants.exec;
 
 /**
  * @author Sateesh Pinnamaneni
@@ -22,34 +24,49 @@ import static com.thoughtstream.aepf.zk.Constantants.WATERMARK_STR;
 public class EventsOrchestrator<T extends Event> {
     private static final Logger log = LoggerFactory.getLogger(EventsOrchestrator.class);
 
-    private final String applicationPath;
-    private final String watermarksRootPath;
-    private final EventSerializerDeserializer<T> eventSerializerDeserializer;
-    private final WatermarkSerializerDeserializer<T> watermarkSerializerDeserializer;
-    private final Collection<EventSourcerFactory<T>> eventSourcerFactories;
-    private final ShardKeyProvider<T> shardKeyProvider;
-    private final int maxOutstandingEventsPerEventSource;
-    private final String applicationId;
-    private final String zookeeperRoot;
+    private final List<LeaderSelector> leaderSelectorList = new LinkedList<>();
 
-
-    private final CuratorFramework zkClient;
-
-
-    public EventsOrchestrator(CuratorFramework zkClient, String zookeeperRoot, String applicationId,
+    public EventsOrchestrator(CuratorFramework zkClient, ZkPathsProvider zkPathsProvider,
                               Collection<EventSourcerFactory<T>> eventSourcerFactories, EventSerializerDeserializer<T> eventSerializerDeserializer,
                               ShardKeyProvider<T> shardKeyProvider, int maxOutstandingEventsPerEventSource) {
-        this.zkClient = zkClient;
-        this.zookeeperRoot = zookeeperRoot;
-        this.applicationId = applicationId;
-        this.shardKeyProvider = shardKeyProvider;
-        this.eventSerializerDeserializer = eventSerializerDeserializer;
-        this.maxOutstandingEventsPerEventSource = maxOutstandingEventsPerEventSource;
-        this.watermarkSerializerDeserializer = new DefaultWatermarkSerializerDeserializer<>(eventSerializerDeserializer);
-        this.eventSourcerFactories = eventSourcerFactories;
-        this.applicationPath = zookeeperRoot + "/" + applicationId;
-        this.watermarksRootPath = applicationPath + "/" + WATERMARK_STR;
-        //FIXME: validate eventSourcerFactories, such as duplicates, etc..
+
+        WatermarkSerializerDeserializer<T> watermarkSerializerDeserializer = new DefaultWatermarkSerializerDeserializer<>(eventSerializerDeserializer);
+        String watermarksRootPath = zkPathsProvider.getWatermarksPath();
+
+
+        try {
+            String applicationPath = zkPathsProvider.getApplicationPath();
+            Stat applicationExists = zkClient.checkExists().forPath(applicationPath);
+
+            if (applicationExists == null) {
+                throw new RuntimeException("Supplied Zookeeper Node Path for application does not exist: " + applicationPath);
+            }
+
+            if (zkClient.checkExists().forPath(watermarksRootPath) == null) {
+                log.info("Watermark root not found, creating: " + watermarksRootPath); //FIXME: make this behavior configurable, client may not want auto watermark created
+                zkClient.create().forPath(watermarksRootPath, "".getBytes(DEFAULT_CHAR_SET));
+            }
+
+            for (EventSourcerFactory<T> eventSourcerFactory : eventSourcerFactories) { //FIXME: delay between event sourcers
+                final String eventSourceId = eventSourcerFactory.getSourceId();
+                final String watermarkPath = zkPathsProvider.getWatermarkPath(eventSourcerFactory.getSourceId());
+
+                if (zkClient.checkExists().forPath(watermarkPath) == null) {
+                    log.info("Watermark not found for eventSource[{}], creating: {}", eventSourcerFactory.getSourceId(), watermarkPath);
+                    zkClient.create().forPath(watermarkPath, watermarkSerializerDeserializer.serialize(new Watermark<>()));
+                }
+
+                LeaderSelectorListener listener = new EventsOrchestratorLeaderSelector<>(zkClient, zkPathsProvider,
+                        eventSourcerFactory, eventSourceId, eventSerializerDeserializer, watermarkSerializerDeserializer,
+                        shardKeyProvider, maxOutstandingEventsPerEventSource);
+
+                LeaderSelector selector = new LeaderSelector(zkClient, watermarkPath, listener);
+                selector.autoRequeue();
+                leaderSelectorList.add(selector);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e); //FIXME: enxception types
+        }
     }
 
     public boolean isHealthy() {
@@ -58,38 +75,12 @@ public class EventsOrchestrator<T extends Event> {
     }
 
     public void stop() throws Exception {
-        //FIXME
+        for (LeaderSelector leaderSelector : leaderSelectorList) {
+            exec(leaderSelector::close);
+        }
     }
 
     public void start() throws Exception {
-
-        Stat applicationExists = zkClient.checkExists().forPath(applicationPath);
-
-        if (applicationExists == null) {
-            throw new RuntimeException("Supplied Zookeeper Node Path for application does not exist: " + applicationPath);
-        }
-
-        if (zkClient.checkExists().forPath(watermarksRootPath) == null) {
-            log.info("Watermark root not found, creating: " + watermarksRootPath); //FIXME: make this behavior configurable, client may not want auto watermark created
-            zkClient.create().forPath(watermarksRootPath, "".getBytes(DEFAULT_CHAR_SET));
-        }
-
-        for (EventSourcerFactory<T> eventSourcerFactory : eventSourcerFactories) { //FIXME: delay between event sourcers
-            final String eventSourceId = eventSourcerFactory.getSourceId();
-            final String watermarkPath = watermarksRootPath + "/" + eventSourcerFactory.getSourceId();
-
-            if (zkClient.checkExists().forPath(watermarkPath) == null) {
-                log.info("Watermark not found for eventSource[{}], creating: {}", eventSourcerFactory.getSourceId(), watermarkPath);
-                zkClient.create().forPath(watermarkPath, watermarkSerializerDeserializer.serialize(new Watermark<>()));
-            }
-
-            LeaderSelectorListener listener = new EventsOrchestratorLeaderSelector<>(zkClient, zookeeperRoot, applicationId,
-                    eventSourcerFactory, watermarkPath, eventSourceId, eventSerializerDeserializer, watermarkSerializerDeserializer,
-                    shardKeyProvider, maxOutstandingEventsPerEventSource);
-
-            LeaderSelector selector = new LeaderSelector(zkClient, watermarkPath, listener);
-            selector.autoRequeue();
-            selector.start();
-        }
+        leaderSelectorList.forEach(LeaderSelector::start);
     }
 }

@@ -22,35 +22,21 @@ import static com.thoughtstream.aepf.DefaultConstants.exec;
 public class EventWorker<T extends Event> {
     private static final Logger log = LoggerFactory.getLogger(EventWorker.class);
 
-    private final static String WATERMARK_STR = "watermarks";
-    private final static String QUEUES_STR = "queues";
-    private final static String LOCK_STR = "-lock";
-
-    private final String applicationPath;
-    private final String outstandingTasksQueuePath;
-    private final String outstandingTasksQueueLockPath;
-    private final String completedTasksQueuePath;
-    private final String completedTasksQueueLockPath;
     private final EventQueueSerializer<T> eventQueueSerializer;
-    private final EventSerializerDeserializer<T> eventSerializerDeserializer;
     private final EventHandler<T> eventHandler;
 
     private DistributedIdQueue<QueuedEvent<T>> completedTasksQueue = null;
     private DistributedIdQueue<QueuedEvent<T>> outstandingTasksQueue = null;
 
     private final CuratorFramework zkClient;
+    private final ZkPathsProvider zkPathsProvider;
 
-    public EventWorker(CuratorFramework zkClient, String watermarksRoot, String applicationId,
+    public EventWorker(CuratorFramework zkClient, ZkPathsProvider zkPathsProvider,
                        EventSerializerDeserializer<T> eventSerializerDeserializer, EventHandler<T> eventHandler) {
         this.zkClient = zkClient;
-        this.eventSerializerDeserializer = eventSerializerDeserializer;
+        this.zkPathsProvider = zkPathsProvider;
         this.eventHandler = eventHandler;
-        this.applicationPath = watermarksRoot + "/" + applicationId;
-        this.outstandingTasksQueuePath = applicationPath + "/" + QUEUES_STR + "/outstandingTasks";
-        this.outstandingTasksQueueLockPath = outstandingTasksQueuePath + LOCK_STR;
-        this.completedTasksQueuePath = applicationPath + "/" + QUEUES_STR + "/completedTasks";
-        this.completedTasksQueueLockPath = completedTasksQueuePath + LOCK_STR;
-        this.eventQueueSerializer = new EventQueueSerializer<>(this.eventSerializerDeserializer);
+        this.eventQueueSerializer = new EventQueueSerializer<>(eventSerializerDeserializer);
     }
 
     public boolean isHealthy() {
@@ -74,6 +60,7 @@ public class EventWorker<T extends Event> {
             throw new RuntimeException("Running already!");
         }
 
+        String applicationPath = zkPathsProvider.getApplicationPath();
         Stat applicationExists = zkClient.checkExists().forPath(applicationPath);
 
         if (applicationExists == null) {
@@ -81,8 +68,8 @@ public class EventWorker<T extends Event> {
         }
 
         try {
-            completedTasksQueue = QueueBuilder.builder(zkClient, null, eventQueueSerializer, completedTasksQueuePath)
-                    .lockPath(completedTasksQueueLockPath)
+            completedTasksQueue = QueueBuilder.builder(zkClient, null, eventQueueSerializer, zkPathsProvider.getCompletedTasksQueuePath())
+                    .lockPath(zkPathsProvider.getCompletedTasksQueueLockPath())
                     .buildIdQueue();
             completedTasksQueue.start();
 
@@ -91,18 +78,18 @@ public class EventWorker<T extends Event> {
             outstandingTasksQueue = QueueBuilder.builder(zkClient, new QueueConsumer<QueuedEvent<T>>() {
                 @Override
                 public void consumeMessage(QueuedEvent<T> message) throws Exception {
-                    log.info("Processing: {}", message);
+                    log.info("[RECEIVED]Processing: {}", message);
                     eventHandler.process(message.getEvent());
                     completedTasksQueueFinal.put(message, "FIXME");
-                    log.info("Finished processing: {}", message);
+                    log.info("[PROCESSED]Finished processing: {}", message);
                 }
 
                 @Override
                 public void stateChanged(CuratorFramework curatorFramework, ConnectionState connectionState) {
                     log.info("Connection state changed to: " + connectionState.name());
                 }
-            }, eventQueueSerializer, outstandingTasksQueuePath)
-                    .lockPath(outstandingTasksQueueLockPath)
+            }, eventQueueSerializer, zkPathsProvider.getOutstandingTasksQueuePath())
+                    .lockPath(zkPathsProvider.getOutstandingTasksQueueLockPath())
                     .buildIdQueue();
             outstandingTasksQueue.start();
         } catch (Exception e) {

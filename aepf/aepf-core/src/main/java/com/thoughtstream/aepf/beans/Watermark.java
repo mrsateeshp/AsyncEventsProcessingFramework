@@ -2,7 +2,7 @@ package com.thoughtstream.aepf.beans;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -38,5 +38,24 @@ public class Watermark<T extends Event> {
 
     public void setOutstandingEvents(LinkedHashMap<String, LinkedList<T>> outstandingEvents) {
         this.outstandingEvents = outstandingEvents;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Watermark<?> watermark = (Watermark<?>) o;
+
+        if (lastEvent != null ? !lastEvent.equals(watermark.lastEvent) : watermark.lastEvent != null) return false;
+        return outstandingEvents != null ? outstandingEvents.equals(watermark.outstandingEvents) : watermark.outstandingEvents == null;
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = lastEvent != null ? lastEvent.hashCode() : 0;
+        result = 31 * result + (outstandingEvents != null ? outstandingEvents.hashCode() : 0);
+        return result;
     }
 }

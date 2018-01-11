@@ -7,6 +7,7 @@ import com.thoughtstream.aepf.handlers.EventSourcerFactory;
 import com.thoughtstream.aepf.handlers.ShardKeyProvider;
 import com.thoughtstream.aepf.zk.EventWorker;
 import com.thoughtstream.aepf.zk.EventsOrchestrator;
+import com.thoughtstream.aepf.zk.ZkPathsProvider;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -34,14 +35,15 @@ public class AsyncEventsProcessor<T extends Event> {
     private final EventHandler<T> eventHandler;
     private final int maxOutstandingEventsPerEventSource;
     private final boolean runAsDaemon;
-    private volatile boolean stop = true;
+    private volatile boolean isRunning = false;
     private volatile AsyncEventsProcessorRunnable currentWorker = null;
     private final ThreadGroup threadGroup = new ThreadGroup("AsyncEventsProcessorThread");
 
     public AsyncEventsProcessor(String zookeeperConnectionStr, String zookeeperRoot, String applicationId,
                                 Collection<EventSourcerFactory<T>> eventSourcerFactories,
                                 EventSerializerDeserializer<T> eventSerializerDeserializer,
-                                ShardKeyProvider<T> shardKeyProvider, EventHandler<T> eventHandler, int maxOutstandingEventsPerEventSource, boolean runAsDaemon) {
+                                ShardKeyProvider<T> shardKeyProvider, EventHandler<T> eventHandler,
+                                int maxOutstandingEventsPerEventSource, boolean runAsDaemon) {
         this.zookeeperConnectionStr = zookeeperConnectionStr;
         this.zookeeperRoot = zookeeperRoot;
         this.applicationId = applicationId;
@@ -54,21 +56,27 @@ public class AsyncEventsProcessor<T extends Event> {
     }
 
     public synchronized void stop() {
-        stop = true;
         if (currentWorker != null) {
-            currentWorker.stop();
+            exec(currentWorker::stop);
         }
+        isRunning = false;
     }
 
     public synchronized void start() {
-        if (!stop) {
+        if (isRunning) {
             throw new RuntimeException("already running!");
         }
 
-        Thread thread = new Thread(threadGroup, new AsyncEventsProcessorRunnable());
-        thread.setDaemon(runAsDaemon);
-        thread.start();
-        stop = false;
+        try {
+            Thread thread = new Thread(threadGroup, new AsyncEventsProcessorRunnable());
+            thread.setDaemon(runAsDaemon);
+            thread.start();
+            isRunning = true;
+        } catch (Exception e) {
+            log.error("Got exception while starting, hence stopping: ", e);
+            stop();
+            throw new RuntimeException(e);
+        }
     }
 
     private class AsyncEventsProcessorRunnable implements Runnable {
@@ -85,8 +93,9 @@ public class AsyncEventsProcessor<T extends Event> {
                 zkClient = CuratorFrameworkFactory.newClient(zookeeperConnectionStr, retryPolicy);
                 zkClient.start();
 
-                eventWorker = new EventWorker<>(zkClient, zookeeperRoot, applicationId, eventSerializerDeserializer, eventHandler);
-                eventsOrchestrator = new EventsOrchestrator<>(zkClient, zookeeperRoot, applicationId, eventSourcerFactories,
+                ZkPathsProvider zkPathsProvider = new ZkPathsProvider(zookeeperRoot, applicationId);
+                eventWorker = new EventWorker<>(zkClient, zkPathsProvider, eventSerializerDeserializer, eventHandler);
+                eventsOrchestrator = new EventsOrchestrator<>(zkClient, zkPathsProvider, eventSourcerFactories,
                         eventSerializerDeserializer, shardKeyProvider, maxOutstandingEventsPerEventSource);
 
                 eventWorker.start();

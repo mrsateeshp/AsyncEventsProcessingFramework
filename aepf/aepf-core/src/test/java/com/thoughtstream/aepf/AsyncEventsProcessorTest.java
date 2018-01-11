@@ -1,15 +1,6 @@
 package com.thoughtstream.aepf;
 
 import com.thoughtstream.aepf.handlers.EventSourcerFactory;
-import org.apache.curator.RetryPolicy;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.recipes.leader.CancelLeadershipException;
-import org.apache.curator.framework.recipes.leader.LeaderSelector;
-import org.apache.curator.framework.recipes.leader.LeaderSelectorListener;
-import org.apache.curator.framework.recipes.leader.LeaderSelectorListenerAdapter;
-import org.apache.curator.framework.state.ConnectionState;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.junit.Test;
 
 import java.util.LinkedList;
@@ -20,7 +11,7 @@ import java.util.List;
  * @since 05/01/2018
  */
 public class AsyncEventsProcessorTest {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws Exception {
         List<EventSourcerFactory<IndexBasedEvent>> eventSourcerFactories = new LinkedList<>();
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer1"));
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer2"));
