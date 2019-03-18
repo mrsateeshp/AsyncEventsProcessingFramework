@@ -1,0 +1,3 @@
+rootProject.name= 'aepf-aggregator'
+
+include 'aepf-core', 'aepf-test-impl'

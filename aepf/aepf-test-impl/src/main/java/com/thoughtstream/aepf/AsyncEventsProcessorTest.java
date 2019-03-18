@@ -1,6 +1,8 @@
 package com.thoughtstream.aepf;
 
 import com.thoughtstream.aepf.handlers.EventSourcerFactory;
+import kamon.Kamon;
+import kamon.prometheus.PrometheusReporter;
 import org.junit.Test;
 
 import java.util.LinkedList;
@@ -12,6 +14,9 @@ import java.util.List;
  */
 public class AsyncEventsProcessorTest {
     public static void main(String[] args) throws Exception {
+        PrometheusReporter prometheusReporter = new PrometheusReporter();
+        Kamon.addReporter(prometheusReporter);
+
         List<EventSourcerFactory<IndexBasedEvent>> eventSourcerFactories = new LinkedList<>();
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer1"));
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer2"));
@@ -22,10 +27,11 @@ public class AsyncEventsProcessorTest {
         IndexBasedEventSerializerDeserializer indexBasedEventSerializerDeserializer = new IndexBasedEventSerializerDeserializer();
         IndexBasedShardKeyProvider shardKeyProvider = new IndexBasedShardKeyProvider();
         IndexBasedEventHandler indexBasedEventHandler = new IndexBasedEventHandler();
-        AsyncEventsProcessor<IndexBasedEvent> processor = new AsyncEventsProcessor<>("127.0.0.1", "/rs", "aepf-test", eventSourcerFactories,
+        String zookeeperConnectionStr = System.getProperty("zkConStr", "host.docker.internal") ;
+        AsyncEventsProcessor<IndexBasedEvent> processor = new AsyncEventsProcessor<>(zookeeperConnectionStr, "/rs", "aepf-test", eventSourcerFactories,
                 indexBasedEventSerializerDeserializer, shardKeyProvider, indexBasedEventHandler, 50, false);
         processor.start();
 
-        Thread.sleep(600000000);
+        Thread.sleep(600000000); //FIXME:
     }
 }
