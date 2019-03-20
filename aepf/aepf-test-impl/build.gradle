@@ -1,6 +1,7 @@
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 
 dependencies {
+    implementation "org.springframework.boot:spring-boot-starter"
     implementation "io.kamon:kamon-core_$scala_major_version"
     implementation "io.kamon:kamon-prometheus_$scala_major_version"
     implementation 'org.slf4j:slf4j-simple'
@@ -9,6 +10,7 @@ dependencies {
 
 apply plugin: 'application'
 apply plugin: 'com.bmuschko.docker-remote-api'
+apply plugin: 'org.springframework.boot'
 
 mainClassName = "com.thoughtstream.aepf.AsyncEventsProcessorTest"
 
