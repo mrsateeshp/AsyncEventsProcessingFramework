@@ -1,0 +1,56 @@
+buildscript {
+    ext {
+        scala_major_version = "2.12"
+    }
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.0.0'
+    }
+}
+
+plugins {
+    id "io.spring.dependency-management" version "1.0.6.RELEASE" apply false
+    id "com.bmuschko.docker-remote-api" version "4.6.2" apply false
+}
+
+def curator_version = '2.12.0'
+
+allprojects {
+    version = '1.0.0-SNAPSHOT'
+
+    apply plugin: 'io.spring.dependency-management'
+
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+
+    dependencyManagement {
+        dependencies {
+            dependency "org.apache.curator:curator-recipes:$curator_version"
+            dependency group: 'org.slf4j', name: 'slf4j-simple', version: '1.6.1'
+            dependency "junit:junit:4.10"
+            dependency "io.kamon:kamon-core_$scala_major_version:1.1.0"
+            dependency "io.kamon:kamon-prometheus_$scala_major_version:1.1.1"
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+}
+
+project(':aepf-test-impl') {
+    dependencies{
+        implementation project(':aepf-core')
+    }
+}
+
+
+
+
+

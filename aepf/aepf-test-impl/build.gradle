@@ -1,0 +1,34 @@
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+
+dependencies {
+    implementation "io.kamon:kamon-core_$scala_major_version"
+    implementation "io.kamon:kamon-prometheus_$scala_major_version"
+    implementation 'org.slf4j:slf4j-simple'
+    implementation 'junit:junit' //FIXME:
+}
+
+apply plugin: 'application'
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+mainClassName = "com.thoughtstream.aepf.AsyncEventsProcessorTest"
+
+jar {
+    manifest {
+        attributes(
+                'Class-Path': configurations.runtimeClasspath.files.collect { "$it.name" }.join(' '),
+                'Main-Class': mainClassName
+        )
+    }
+}
+
+task task1{
+    doLast() {
+        println "version is " + project.version.toString()
+    }
+}
+task buildImage(type: DockerBuildImage) {
+    dependsOn build
+    inputDir = project.file('Dockerfile').parentFile
+    buildArgs = ['artifactVersion': version.toString()]
+    tags.add('mrsateeshp/' + project.name + ':' + version.toString())
+}
