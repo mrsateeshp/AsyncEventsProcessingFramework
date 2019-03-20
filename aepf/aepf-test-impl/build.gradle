@@ -4,7 +4,7 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter"
     implementation "io.kamon:kamon-core_$scala_major_version"
     implementation "io.kamon:kamon-prometheus_$scala_major_version"
-    implementation 'junit:junit' //FIXME:
+    testImplementation 'junit:junit'
 }
 
 apply plugin: 'application'
