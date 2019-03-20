@@ -1,4 +1,4 @@
-package com.thoughtstream.aepf;
+package com.thoughtstream.aepf.testimpl;
 
 import com.thoughtstream.aepf.handlers.ShardKeyProvider;
 

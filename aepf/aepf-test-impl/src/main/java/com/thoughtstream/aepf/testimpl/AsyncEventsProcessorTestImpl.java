@@ -1,9 +1,15 @@
-package com.thoughtstream.aepf;
+package com.thoughtstream.aepf.testimpl;
 
+import com.thoughtstream.aepf.AsyncEventsProcessor;
 import com.thoughtstream.aepf.handlers.EventSourcerFactory;
 import kamon.Kamon;
 import kamon.prometheus.PrometheusReporter;
-import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -12,8 +18,21 @@ import java.util.List;
  * @author Sateesh Pinnamaneni
  * @since 05/01/2018
  */
-public class AsyncEventsProcessorTest {
-    public static void main(String[] args) throws Exception {
+@SpringBootApplication
+public class AsyncEventsProcessorTestImpl implements CommandLineRunner {
+
+    @Value("${zookeeper.connectionStr}")
+    private String zkConStr;
+
+    @Autowired
+    private AsyncEventsProcessor<IndexBasedEvent> processor;
+
+    public static void main(String[] args) {
+        SpringApplication.run(AsyncEventsProcessorTestImpl.class, args);
+    }
+
+    @Bean
+    public AsyncEventsProcessor<IndexBasedEvent> createProcessor() {
         PrometheusReporter prometheusReporter = new PrometheusReporter();
         Kamon.addReporter(prometheusReporter);
 
@@ -27,9 +46,15 @@ public class AsyncEventsProcessorTest {
         IndexBasedEventSerializerDeserializer indexBasedEventSerializerDeserializer = new IndexBasedEventSerializerDeserializer();
         IndexBasedShardKeyProvider shardKeyProvider = new IndexBasedShardKeyProvider();
         IndexBasedEventHandler indexBasedEventHandler = new IndexBasedEventHandler();
-        String zookeeperConnectionStr = System.getProperty("zkConStr", "host.docker.internal") ;
-        AsyncEventsProcessor<IndexBasedEvent> processor = new AsyncEventsProcessor<>(zookeeperConnectionStr, "/rs", "aepf-test", eventSourcerFactories,
+        return new AsyncEventsProcessor<>(zkConStr, "/rs", "aepf-test", eventSourcerFactories,
                 indexBasedEventSerializerDeserializer, shardKeyProvider, indexBasedEventHandler, 50, false);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        PrometheusReporter prometheusReporter = new PrometheusReporter();
+        Kamon.addReporter(prometheusReporter);
+
         processor.start();
 
         Thread.sleep(600000000); //FIXME:

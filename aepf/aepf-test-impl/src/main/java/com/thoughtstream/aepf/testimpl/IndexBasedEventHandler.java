@@ -1,9 +1,9 @@
-package com.thoughtstream.aepf;
+package com.thoughtstream.aepf.testimpl;
 
+import com.thoughtstream.aepf.AsyncEventsProcessor;
 import com.thoughtstream.aepf.handlers.EventHandler;
 import kamon.Kamon;
 import kamon.metric.CounterMetric;
-import kamon.metric.MeasurementUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

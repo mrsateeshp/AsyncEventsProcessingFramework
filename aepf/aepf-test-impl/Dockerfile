@@ -25,4 +25,4 @@ RUN rm -f ${TARGET_APP_DIR}/aepf-test-impl-${artifactVersion}.tar
 HEALTHCHECK --interval=2s --timeout=2s --start-period=2s \
   CMD exit 0
 
-CMD ["sh", "-c", "java -jar $TARGET_APP_LIB_DIR/aepf-test-impl-$artifactVersion.jar"]
+CMD ["sh", "-c", "java -Dspring.config.location=file:/etc/config/application.yml -jar $TARGET_APP_LIB_DIR/aepf-test-impl-$artifactVersion.jar"]
