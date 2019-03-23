@@ -41,8 +41,14 @@ public class EventsOrchestrator<T extends Event> {
             if (applicationExists == null) {
                 //FIXME:
 //                throw new RuntimeException("Supplied Zookeeper Node Path for application does not exist: " + applicationPath);
-                zkClient.create().forPath("/rs");
-                zkClient.create().forPath(applicationPath);
+                try {
+                    zkClient.create().forPath("/rs");
+                    zkClient.create().forPath(applicationPath);
+                } catch (Exception e) {
+                    if(zkClient.checkExists().forPath(applicationPath) == null){
+                        throw new RuntimeException(e);
+                    }
+                }
             }
 
             if (zkClient.checkExists().forPath(watermarksRootPath) == null) {

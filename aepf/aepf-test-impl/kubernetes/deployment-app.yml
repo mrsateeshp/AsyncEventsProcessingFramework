@@ -9,12 +9,10 @@ data:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: aepf-test-impl
-  name: aepf-test-impl
+  name: aepf-test-impl-deployment
 spec:
   replicas: 3
   selector:
