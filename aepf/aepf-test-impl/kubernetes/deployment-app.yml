@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aepf-test-impl-config
+data:
+  application.yml: |
+    zookeeper:
+      connectionStr: zookeeper-service
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: aepf-test-impl
+  name: aepf-test-impl
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aepf-test-impl
+  template:
+    metadata:
+      labels:
+        app: aepf-test-impl
+    spec:
+      containers:
+        - name: aepf-test-impl
+          image: mrsateeshp/aepf-test-impl:1.0.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: kamon
+              containerPort: 9095
+              protocol: TCP
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config
+      volumes:
+        - name: config-volume
+          configMap:
+            name: aepf-test-impl-config
