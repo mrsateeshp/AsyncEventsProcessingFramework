@@ -8,6 +8,7 @@ import com.thoughtstream.aepf.handlers.ShardKeyProvider;
 import com.thoughtstream.aepf.zk.EventWorker;
 import com.thoughtstream.aepf.zk.EventsOrchestrator;
 import com.thoughtstream.aepf.zk.ZkPathsProvider;
+import io.prometheus.client.exporter.HTTPServer;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -15,6 +16,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Collection;
 
 import static com.thoughtstream.aepf.DefaultConstants.exec;
@@ -38,6 +40,17 @@ public class AsyncEventsProcessor<T extends Event> {
     private volatile boolean isRunning = false;
     private volatile AsyncEventsProcessorRunnable currentWorker = null;
     private final ThreadGroup threadGroup = new ThreadGroup("AsyncEventsProcessorThread");
+    private static final HTTPServer prometheusServer;
+
+    static {
+        //FIXME: bad
+        try {
+            prometheusServer = new HTTPServer(9095);
+        } catch (IOException e) {
+            throw new RuntimeException(e);//FIXME: exception type
+        }
+    }
+
 
     public AsyncEventsProcessor(String zookeeperConnectionStr, String zookeeperRoot, String applicationId,
                                 Collection<EventSourcerFactory<T>> eventSourcerFactories,

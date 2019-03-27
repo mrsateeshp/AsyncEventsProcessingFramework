@@ -1,5 +1,7 @@
 
 dependencies{
     implementation 'org.apache.curator:curator-recipes'
+    implementation "io.prometheus:simpleclient:0.6.0"
+    implementation "io.prometheus:simpleclient_httpserver:0.6.0"
     testImplementation 'junit:junit'
 }

@@ -62,7 +62,14 @@ public class EventsOrchestrator<T extends Event> {
 
                 if (zkClient.checkExists().forPath(watermarkPath) == null) {
                     log.info("Watermark not found for eventSource[{}], creating: {}", eventSourcerFactory.getSourceId(), watermarkPath);
-                    zkClient.create().forPath(watermarkPath, watermarkSerializerDeserializer.serialize(new Watermark<>()));
+                    //FIXME: this can lead to race condition between the instances.
+                    try {
+                        zkClient.create().forPath(watermarkPath, watermarkSerializerDeserializer.serialize(new Watermark<>()));
+                    } catch (Exception e) {
+                        if (zkClient.checkExists().forPath(watermarkPath) == null){
+                            throw new RuntimeException("Failed to create zookeeper node for the new sourcer!");
+                        }
+                    }
                 }
 
                 LeaderSelectorListener listener = new EventsOrchestratorLeaderSelector<>(zkClient, zkPathsProvider,

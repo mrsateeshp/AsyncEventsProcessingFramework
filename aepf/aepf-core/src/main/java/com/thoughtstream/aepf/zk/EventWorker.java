@@ -4,6 +4,7 @@ import com.thoughtstream.aepf.beans.Event;
 import com.thoughtstream.aepf.beans.QueuedEvent;
 import com.thoughtstream.aepf.handlers.EventHandler;
 import com.thoughtstream.aepf.handlers.EventSerializerDeserializer;
+import io.prometheus.client.Counter;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.queue.DistributedIdQueue;
 import org.apache.curator.framework.recipes.queue.QueueBuilder;
@@ -21,6 +22,12 @@ import static com.thoughtstream.aepf.DefaultConstants.exec;
  */
 public class EventWorker<T extends Event> {
     private static final Logger log = LoggerFactory.getLogger(EventWorker.class);
+
+    private static Counter processedReqCounter = Counter.build().namespace("worker").name("processed_requests")
+            .labelNames("srcId").help("counts no of requests processed.").register();
+
+    private static Counter failedReqCounter = Counter.build().namespace("worker").name("failed_requests")
+            .labelNames("srcId").help("counts no of requests processed.").register();
 
     private final EventQueueSerializer<T> eventQueueSerializer;
     private final EventHandler<T> eventHandler;
@@ -78,10 +85,16 @@ public class EventWorker<T extends Event> {
             outstandingTasksQueue = QueueBuilder.builder(zkClient, new QueueConsumer<QueuedEvent<T>>() {
                 @Override
                 public void consumeMessage(QueuedEvent<T> message) throws Exception {
-                    log.info("[RECEIVED]Processing: {}", message);
-                    eventHandler.process(message.getEvent());
-                    completedTasksQueueFinal.put(message, "FIXME");
-                    log.info("[PROCESSED]Finished processing: {}", message);
+                    try {
+                        log.info("[RECEIVED]Processing: {}", message);
+                        eventHandler.process(message.getEvent());
+                        completedTasksQueueFinal.put(message, "FIXME");
+                        processedReqCounter.labels(message.getEventSourceId()).inc();
+                        log.info("[PROCESSED]Finished processing: {}", message);
+                    } catch (Exception e) {
+                        failedReqCounter.labels(message.getEventSourceId()).inc();
+                        throw e;
+                    }
                 }
 
                 @Override

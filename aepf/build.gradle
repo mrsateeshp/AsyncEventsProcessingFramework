@@ -1,6 +1,6 @@
 buildscript {
     ext {
-        scala_major_version = "2.12"
+        curator_version = '2.12.0'
     }
     repositories {
         jcenter()
@@ -14,8 +14,6 @@ buildscript {
 plugins {
     id "com.bmuschko.docker-remote-api" version "4.6.2" apply false
 }
-
-def curator_version = '2.12.0'
 
 allprojects {
     version = '1.0.0-SNAPSHOT'
@@ -32,8 +30,6 @@ allprojects {
             dependency "org.apache.curator:curator-recipes:$curator_version"
             dependency group: 'org.slf4j', name: 'slf4j-simple', version: '1.6.1'
             dependency "junit:junit:4.10"
-            dependency "io.kamon:kamon-core_$scala_major_version:1.1.0"
-            dependency "io.kamon:kamon-prometheus_$scala_major_version:1.1.1"
         }
     }
 }

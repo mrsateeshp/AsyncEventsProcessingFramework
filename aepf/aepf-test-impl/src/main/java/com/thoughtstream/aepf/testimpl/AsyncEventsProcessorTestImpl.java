@@ -2,8 +2,6 @@ package com.thoughtstream.aepf.testimpl;
 
 import com.thoughtstream.aepf.AsyncEventsProcessor;
 import com.thoughtstream.aepf.handlers.EventSourcerFactory;
-import kamon.Kamon;
-import kamon.prometheus.PrometheusReporter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -33,9 +31,6 @@ public class AsyncEventsProcessorTestImpl implements CommandLineRunner {
 
     @Bean
     public AsyncEventsProcessor<IndexBasedEvent> createProcessor() {
-        PrometheusReporter prometheusReporter = new PrometheusReporter();
-        Kamon.addReporter(prometheusReporter);
-
         List<EventSourcerFactory<IndexBasedEvent>> eventSourcerFactories = new LinkedList<>();
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer1"));
         eventSourcerFactories.add(new IndexBasedEventSourcerFactory("Sourcer2"));
@@ -52,9 +47,6 @@ public class AsyncEventsProcessorTestImpl implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        PrometheusReporter prometheusReporter = new PrometheusReporter();
-        Kamon.addReporter(prometheusReporter);
-
         processor.start();
 
         Thread.sleep(600000000); //FIXME:
