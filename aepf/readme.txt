@@ -5,3 +5,11 @@ docker run -d -p 9096:9095 -v /Users/spinnama/dev/github/AsyncEventsProcessingFr
 docker run -d -p 9097:9095 -v /Users/spinnama/dev/github/AsyncEventsProcessingFramework/aepf/aepf-test-impl/src/test/resources/application-docker.yml:/etc/config/application.yml mrsateeshp/aepf-test-impl:1.0.0-SNAPSHOT
 
 query: rate(index_based_requests_total[15s])
+
+docker volume create grafana-data
+
+docker run \
+  -d \
+  -p 3000:3000 \
+  -v grafana-data:/var/lib/grafana \
+  grafana/grafana:6.0.2
