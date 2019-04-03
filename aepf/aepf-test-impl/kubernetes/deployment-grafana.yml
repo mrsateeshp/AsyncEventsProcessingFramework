@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      protocol: TCP
+      nodePort: 30002
+  selector:
+    app: grafana
+
+---
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: grafana-volume
+  labels:
+    type: grafana-data
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/Users/spinnama/data/grafana-data"
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: grafana-volume-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  selector:
+    matchLabels:
+      type: grafana-data
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:6.0.2
+          ports:
+            - name: client
+              containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - name: grafana-volume
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: grafana-volume
+          persistentVolumeClaim:
+            claimName: grafana-volume-claim

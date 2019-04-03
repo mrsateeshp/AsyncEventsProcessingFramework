@@ -46,6 +46,40 @@ data:
 
 ---
 
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: prometheus-volume
+  labels:
+    type: prometheus-data
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/Users/spinnama/data/prometheus-data"
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: prometheus-volume-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  selector:
+    matchLabels:
+      type: prometheus-data
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -70,7 +104,12 @@ spec:
           volumeMounts:
             - name: config-volume-prometheus
               mountPath: /etc/prometheus
+            - name: prometheus-volume
+              mountPath: /prometheus
       volumes:
         - name: config-volume-prometheus
           configMap:
             name: prometheus-config
+        - name: prometheus-volume
+          persistentVolumeClaim:
+            claimName: prometheus-volume-claim
