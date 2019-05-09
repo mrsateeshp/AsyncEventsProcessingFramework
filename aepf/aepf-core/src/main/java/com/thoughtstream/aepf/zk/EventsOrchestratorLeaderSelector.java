@@ -4,6 +4,7 @@ import com.thoughtstream.aepf.beans.Event;
 import com.thoughtstream.aepf.beans.QueuedEvent;
 import com.thoughtstream.aepf.beans.Watermark;
 import com.thoughtstream.aepf.handlers.*;
+import io.prometheus.client.Gauge;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.leader.CancelLeadershipException;
 import org.apache.curator.framework.recipes.leader.LeaderSelectorListenerAdapter;
@@ -28,6 +29,12 @@ import static com.thoughtstream.aepf.DefaultConstants.exec;
  */
 class EventsOrchestratorLeaderSelector<T extends Event> extends LeaderSelectorListenerAdapter {
     private static final Logger log = LoggerFactory.getLogger(EventsOrchestrator.class);
+
+    private static final Gauge outstandingEventShardsGauge = Gauge.build().namespace("leader").name("outstanding_event_shards")
+            .labelNames("srcId").help("No of event shards waiting to be processed!").register();
+
+    private static final Gauge outstandingEventsGauge = Gauge.build().namespace("leader").name("outstanding_events")
+            .labelNames("srcId").help("No of events waiting to be processed!").register();
 
     private final EventSourcerFactory<T> eventSourcerFactory;
     private final String watermarkPath;
@@ -147,6 +154,9 @@ class EventsOrchestratorLeaderSelector<T extends Event> extends LeaderSelectorLi
                             zkClient.setData().withVersion(versionOfDataBeforeUpdate).forPath(watermarkPath, updatedWatermarkBytes);
                             log.info("[ORCHESTRATOR] updated watermark for [{}]: {}", watermarkPath, new String(updatedWatermarkBytes, DEFAULT_CHAR_SET));
                         }
+
+                        outstandingEventShardsGauge.set(updatedWatermark.getOutstandingEvents().keySet().size());
+                        outstandingEventsGauge.set(updatedWatermark.getOutstandingEvents().values().stream().mapToInt(LinkedList::size).sum());
                     } finally {
                         exec(watermarkGlobalLock::release);
                     }

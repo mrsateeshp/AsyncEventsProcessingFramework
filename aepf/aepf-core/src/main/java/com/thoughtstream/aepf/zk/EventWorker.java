@@ -5,6 +5,7 @@ import com.thoughtstream.aepf.beans.QueuedEvent;
 import com.thoughtstream.aepf.handlers.EventHandler;
 import com.thoughtstream.aepf.handlers.EventSerializerDeserializer;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.queue.DistributedIdQueue;
 import org.apache.curator.framework.recipes.queue.QueueBuilder;
@@ -13,6 +14,8 @@ import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.thoughtstream.aepf.DefaultConstants.exec;
 
@@ -27,7 +30,11 @@ public class EventWorker<T extends Event> {
             .labelNames("srcId").help("counts no of requests processed.").register();
 
     private static Counter failedReqCounter = Counter.build().namespace("worker").name("failed_requests")
-            .labelNames("srcId").help("counts no of requests processed.").register();
+            .labelNames("srcId").help("counts no of requests failed.").register();
+
+    private static Histogram processingTime = Histogram.build().namespace("worker").name("request_duration_sec")
+            .labelNames("srcId").help("Request processing time histogram.").register();
+
 
     private final EventQueueSerializer<T> eventQueueSerializer;
     private final EventHandler<T> eventHandler;
@@ -85,14 +92,21 @@ public class EventWorker<T extends Event> {
             outstandingTasksQueue = QueueBuilder.builder(zkClient, new QueueConsumer<QueuedEvent<T>>() {
                 @Override
                 public void consumeMessage(QueuedEvent<T> message) throws Exception {
+                    String eventSourceId = message.getEventSourceId();
                     try {
                         log.info("[RECEIVED]Processing: {}", message);
+
+                        long startTime = System.currentTimeMillis();
                         eventHandler.process(message.getEvent());
+                        long endTime = System.currentTimeMillis();
+
                         completedTasksQueueFinal.put(message, "FIXME");
-                        processedReqCounter.labels(message.getEventSourceId()).inc();
+                        processedReqCounter.labels(eventSourceId).inc();
+                        processingTime.labels(eventSourceId)
+                                .observe(TimeUnit.SECONDS.convert(endTime - startTime, TimeUnit.MILLISECONDS));
                         log.info("[PROCESSED]Finished processing: {}", message);
                     } catch (Exception e) {
-                        failedReqCounter.labels(message.getEventSourceId()).inc();
+                        failedReqCounter.labels(eventSourceId).inc();
                         throw e;
                     }
                 }

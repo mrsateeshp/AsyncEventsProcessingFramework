@@ -42,7 +42,7 @@ public class AsyncEventsProcessorTestImpl implements CommandLineRunner {
         IndexBasedShardKeyProvider shardKeyProvider = new IndexBasedShardKeyProvider();
         IndexBasedEventHandler indexBasedEventHandler = new IndexBasedEventHandler();
         return new AsyncEventsProcessor<>(zkConStr, "/rs", "aepf-test", eventSourcerFactories,
-                indexBasedEventSerializerDeserializer, shardKeyProvider, indexBasedEventHandler, 50, false);
+                indexBasedEventSerializerDeserializer, shardKeyProvider, indexBasedEventHandler, 500, false);
     }
 
     @Override
